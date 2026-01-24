@@ -1,7 +1,7 @@
 /*cascading stylesheet, easy to make just define by html tag*/
 
 html{
-	background-image: url('content/LogoTransp.gif');
+	background-image: url(content/LogoTransp.gif);
 	background-position: center;
 	background-size: 40%;
 	background-repeat: no-repeat;
