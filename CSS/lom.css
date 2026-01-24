@@ -15,7 +15,7 @@ html{
 .container{
 	display: flex;
 	align-items: center;
-	margin-top: 50vh;
+	margin-top: 75vh;
 	justify-content: center;
 	max-width: fit-content;
 	margin-left: auto;
