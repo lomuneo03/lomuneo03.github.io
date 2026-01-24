@@ -1,0 +1,71 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="CSS/lom.css">
+	<!-- Default favicon -->
+	<link rel="icon" type="image/x-icon" href="Content/Logo-Lightmode.png">
+	<!-- Light mode favicon -->
+	<link rel="icon" type="image/x-icon" href="Content/Logo-Lightmode.png" media="(prefers-color-scheme: light)">
+	<!-- Dark mode favicon -->
+	<link rel="icon" type="image/x-icon" href="Content/Logo-Darkmode.png" media="(prefers-color-scheme: dark)">
+	<title>Lomuneo</title>
+</head>
+<body>
+	<div class="container">
+
+		<!-- Icecast Live Status Badge - Per DJ -->
+		<div id="icecast-status-badge" data-mountpoint="/lomuneo"></div>
+		<script>
+		(function() {
+			const ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl';
+			const POLL_INTERVAL = 30000;
+			const badge = document.getElementById('icecast-status-badge');
+			const mountpoint = badge.dataset.mountpoint; // e.g., "/dj-mike"
+			badge.innerHTML = '<div class="icecast-badge offline"><span class="icecast-dot"></span><span>Checking...</span></div>';
+			function isStreamLive(data, mount) {
+			if (!data.icestats || !data.icestats.source) return false;
+			const sources = Array.isArray(data.icestats.source)
+				? data.icestats.source
+				: [data.icestats.source];
+			return sources.some(s => s.listenurl && s.listenurl.endsWith(mount));
+			}
+			function updateStatus() {
+			fetch(ICECAST_URL)
+				.then(r => r.json())
+				.then(data => {
+				const isLive = isStreamLive(data, mountpoint);
+				const badgeEl = badge.querySelector('.icecast-badge');
+				const textEl = badge.querySelector('.icecast-badge span:last-child');
+				badgeEl.className = isLive ? 'icecast-badge live' : 'icecast-badge offline';
+				textEl.textContent = isLive ? 'Live' : 'Offline';
+				})
+				.catch(() => {
+				const badgeEl = badge.querySelector('.icecast-badge');
+				const textEl = badge.querySelector('.icecast-badge span:last-child');
+				badgeEl.className = 'icecast-badge offline';
+				textEl.textContent = 'Offline';
+				});
+			}
+			updateStatus();
+			setInterval(updateStatus, POLL_INTERVAL);
+		})();
+		</script>
+		<!-- Usage - just change the data-mountpoint: -->
+		<!-- For DJ Mike -->
+		<div id="icecast-status-badge" data-mountpoint="/dj-mike"></div>
+		<!-- For DJ Sarah -->
+		<div id="icecast-status-badge" data-mountpoint="/dj-sarah"></div>
+		<!-- For the lomuneo stream -->
+		<div id="icecast-status-badge" data-mountpoint="/lomuneo"></div>
+
+		<div class="player">
+			<audio controls preload="none" aria-label="Listen live">
+				<source id="stream" src="http://dev.motormeme.com:8000/lomuneo" type="audio/mpeg">
+				<source id="stream" src="http://dev.motormeme.com:8000/lomuneo.ogg" type="audio/ogg">
+			</audio>
+		</div>
+	</div>
+</body>
+</html>
