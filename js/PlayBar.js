@@ -7,6 +7,7 @@
 
 import { render } from './PlayGUI.js';
 import * as DButils from './DebugUtils.js';
+import * as Utils from './Utils.js';
 
 class CustomAudioPlayer extends HTMLElement {
 	constructor() {
@@ -15,16 +16,21 @@ class CustomAudioPlayer extends HTMLElement {
 		this.isPlaying = false;
 		this.duration = 0;
 		this.currentTime = 0;
-		this.maxLiveEdge = 0; // Track the maximum live edge we've seen
-		this.lastLiveEdgeTime = 0; // System time when we last updated maxLiveEdge
-		this.liveUpdateInterval = null; // Interval for updating live edge while paused
+		this.clientStart = 0; // Time of day client first pressed play/jumpToLive in seconds
+		this.clientTime = 0; // Current time in the broadcast for the client
+		this.streamStart = 0; // Time of day stream started
+		this.streamDur = 0; // Current duration of stream
+
+		//icecast json variables
+		this.ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl';
+		this.POLL_INTERVAL = 30000;
 	}
 
 	//Defining class fields for imported functions
 	
 	//Rendering the play bar
 	render = () => render.call(this);
-
+	
 	//Debug utilities class field imports
 	onLoadStart = () => DButils.onLoadStart.call(this);
 	onProgress = () => DButils.onProgress.call(this);
@@ -37,11 +43,21 @@ class CustomAudioPlayer extends HTMLElement {
 	onPlaying = () => DButils.onPlaying.call(this);
 	onWaiting = () => DButils.onWaiting.call(this);
 
+	//General utilities
+	play = () => Utils.play();
+	pause = () => Utils.pause();
+	setSrc = (src) => Utils.setSrc(src);
+	formatTime = (seconds) => Utils.formatTime(seconds);
+
 
 	connectedCallback() {
 		console.log('[CustomAudioPlayer] connectedCallback fired');
 		console.log('[CustomAudioPlayer] Current children:', Array.from(this.children).map(el => `${el.tagName}${el.src ? `(${el.src})` : ''}`));
 		
+		//General utilities
+		//play() = () => Utils.play(this);
+		
+		//initialize functions
 		this.render();
 		
 		// Use a small delay to ensure all child elements are parsed
@@ -101,85 +117,14 @@ class CustomAudioPlayer extends HTMLElement {
 		this.audioElement.addEventListener('error', (e) => this.onAudioError(e));
 		this.audioElement.addEventListener('stalled', () => this.onStalled());
 		this.audioElement.addEventListener('canplay', () => this.onCanPlay());
-		this.audioElement.addEventListener('canplaythrough', () => this.onCanPlayThrough());
+		//this.audioElement.addEventListener('canplaythrough', () => this.onCanPlayThrough());
 		this.audioElement.addEventListener('loadstart', () => this.onLoadStart());
 		this.audioElement.addEventListener('progress', () => this.onProgress());
 		this.audioElement.addEventListener('durationchange', () => this.onDurationChange());
 		this.audioElement.addEventListener('suspend', () => this.onSuspend());
 		this.audioElement.addEventListener('abort', () => this.onAbort());
 	}
-/*
-	onLoadStart() {
-		console.log('[CustomAudioPlayer] Loading stream...');
-	}
 
-	onProgress() {
-		const buffered = this.audioElement.buffered;
-		if (buffered.length > 0) {
-			try {
-				const percentage = (buffered.end(buffered.length - 1) / (this.audioElement.duration || 1) * 100).toFixed(1);
-				console.log(`[CustomAudioPlayer] Buffered: ${percentage}%`);
-			} catch(e) {
-				console.log('[CustomAudioPlayer] Buffering...');
-			}
-		}
-	}
-
-	onDurationChange() {
-		if (this.audioElement.duration === Infinity) {
-			console.log('[CustomAudioPlayer] Live stream detected (infinite duration)');
-		} else if (isNaN(this.audioElement.duration)) {
-			console.log('[CustomAudioPlayer] Duration unknown - stream may not be responding properly');
-		} else {
-			console.log(`[CustomAudioPlayer] Duration: ${this.formatTime(this.audioElement.duration)}`);
-		}
-	}
-
-	onSuspend() {
-		console.log('[CustomAudioPlayer] Suspend - playback temporarily suspended');
-	}
-
-	onAbort() {
-		console.warn('[CustomAudioPlayer] Stream aborted');
-	}
-
-	onAudioError(e) {
-		const error = this.audioElement.error;
-		let errorMsg = 'Unknown error';
-		let errorCode = null;
-		if (error) {
-			errorCode = error.code;
-			switch(error.code) {
-				case error.MEDIA_ERR_ABORTED: errorMsg = 'Playback aborted'; break;
-				case error.MEDIA_ERR_NETWORK: errorMsg = 'Network error - check CORS settings or stream availability'; break;
-				case error.MEDIA_ERR_DECODE: errorMsg = 'Decode error - format may not be supported'; break;
-				case error.MEDIA_ERR_SRC_NOT_SUPPORTED: errorMsg = 'Stream source not supported'; break;
-			}
-		}
-		console.error('[CustomAudioPlayer] Audio Error (Code ' + errorCode + '):', errorMsg);
-		const src = this.audioElement.src || this.audioElement.querySelector('source')?.src;
-		console.error('[CustomAudioPlayer] Stream URL:', src);
-		console.error('[CustomAudioPlayer] NetworkState:', this.audioElement.networkState);
-		console.error('[CustomAudioPlayer] ReadyState:', this.audioElement.readyState);
-	}
-
-	onStalled() {
-		console.warn('[CustomAudioPlayer] Stream stalled - checking connection...');
-		console.warn('[CustomAudioPlayer] NetworkState:', this.audioElement.networkState, '(0=NETWORK_EMPTY, 1=NETWORK_IDLE, 2=NETWORK_LOADING, 3=NETWORK_NO_SOURCE)');
-	}
-
-	onCanPlay() {
-		console.log('[CustomAudioPlayer] Stream ready to play');
-	}
-
-	onPlaying() {
-		console.log('[CustomAudioPlayer] Now playing');
-	}
-
-	onWaiting() {
-		console.log('[CustomAudioPlayer] Waiting for stream data...');
-	}
-*/
 	setupEventListeners() {
 		const playPauseBtn = this.shadowRoot.querySelector('.play-pause-btn');
 		const progressBar = this.shadowRoot.querySelector('.progress-bar');
@@ -231,15 +176,17 @@ class CustomAudioPlayer extends HTMLElement {
 
 	//Toggles play/pause
 	//Includes debug codes first
-	//Usees a promise to check success
+	//Uses a promise to check success
 	togglePlayPause() {
+
 		if (this.audioElement.paused) {
 			console.log('[CustomAudioPlayer] Attempting to play...');
 			console.log('[CustomAudioPlayer] ReadyState:', this.audioElement.readyState, '(0=NOTHING, 1=METADATA, 2=CURRENT, 3=FUTURE, 4=ENOUGH)');
 			console.log('[CustomAudioPlayer] NetworkState:', this.audioElement.networkState, '(0=EMPTY, 1=IDLE, 2=LOADING, 3=NO_SOURCE)');
 			console.log('[CustomAudioPlayer] Current time:', this.audioElement.currentTime);
-			
+
 			const playPromise = this.audioElement.play();
+
 			//Promise returns either a value or undefined, .then and .catch execute based on this result
 			if (playPromise !== undefined) {
 				playPromise
@@ -259,6 +206,14 @@ class CustomAudioPlayer extends HTMLElement {
 
 	//Called when play button is pressed
 	onPlay() {
+		if (this.clientStart == 0) {
+			const worldTime = this.getTimeSecs();
+			console.log('getTimeSecs called by onPlay');
+			this.clientStart = worldTime - this.streamstart;
+		}
+
+		console.log('Client started listening:', this.formatTime(this.clientStart));
+
 		this.isPlaying = true;
 		const btn = this.shadowRoot.querySelector('.play-pause-btn');
 		btn.querySelector('.play-icon').textContent = '⏸';
@@ -292,61 +247,99 @@ class CustomAudioPlayer extends HTMLElement {
 		console.log('Duration debug:', this.duration);
 		
 		if (this.duration == 'Infinity'){
-			this.shadowRoot.querySelector('.duration-time').textContent = '-:--';
+			this.shadowRoot.querySelector('.duration-time').textContent = '--:--';
 		} else {
 			this.shadowRoot.querySelector('.duration-time').textContent = this.formatTime(this.duration);
 		}
-
-		//this.shadowRoot.querySelector('.duration-time').textContent = this.formatTime(this.duration);
 	}
 
+	//This doesnt seem to do anything... creates a new custom event 'ended' but this is only
+	//refrenced above at 141 in setupEventListeners and I can't find anywhere that the event
+	//is referenced to create a behavior. Will leave in case I'm wrong in some way
 	onEnded() {
 		this.dispatchEvent(new CustomEvent('ended'));
 	}
 
+	//I believe this is used to seek with the playbar, but it doesn't work and I don't
+	//think I need it anyway, but I'll leave it until I can figure out for sure
 	seek(e) {
 		const rect = e.currentTarget.getBoundingClientRect();
 		const percent = (e.clientX - rect.left) / rect.width;
 		this.audioElement.currentTime = percent * this.duration;
 	}
 
-	//Broadcast time is given in seconds
-	//Returns time formatted in Minutes:Seconds
-	formatTime(seconds) {
-		if (!seconds || isNaN(seconds)) return '0:00';
-		const mins = Math.floor(seconds / 60);
-		const secs = Math.floor(seconds % 60);
-		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	// Returns EST time converted to seconds
+	// Server runs on EST time so this is useful for a number of things
+	getTimeSecs() {
+		try {
+			console.log('getTimeSecs called');
+			const now = new Date();
+			
+			// Format with timezone and parse the result manually
+			const estString = now.toLocaleString('en-US', { 
+				timeZone: 'America/New_York',
+				hour12: false,
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit'
+			});
+			
+			// Parse the formatted string: "MM/DD/YYYY, HH:mm:ss"
+			const parts = estString.split(/[\/,:\s]+/);
+			const hours = parseInt(parts[3]);
+			const minutes = parseInt(parts[4]);
+			const seconds = parseInt(parts[5]);
+			
+			//console.log('Parsed EST - Hours:', hours, 'Minutes:', minutes, 'Seconds:', seconds);
+			
+			let secTime = (hours * (60 * 60) + (minutes * 60) + seconds);
+			//console.log('Time in seconds:', secTime);
+
+			return secTime;
+		} catch (err) {
+			console.error('Error in getTimeSecs:', err);
+			// Fallback: use local time
+			const now = new Date();
+			const hours = now.getHours();
+			const minutes = now.getMinutes();
+			const seconds = now.getSeconds();
+			const secTime = (hours * (60 * 60) + (minutes * 60) + seconds);
+			console.log('Using fallback local time:', secTime);
+			return secTime;
+		}
 	}
 
-
+	//Enables or disables the live button functionality based on if the user has fallen 3 or
+	//more seconds behind the broadcast. This is done by using an estimate timer that runs
+	//in parallel with the stream to estimate where the stream is. I think there could be a
+	//better way to do this using icecast status-json data but haven't figured it out yet
 	updateLiveButton() {
 		const liveBtn = this.shadowRoot.querySelector('.icecast-badge');
 		if (!liveBtn) return;
 
-		const buffered = this.audioElement.buffered;
-		if (buffered.length > 0) {
-			// Get the current live edge from buffered data
-			const currentBufferedEdge = buffered.end(buffered.length - 1);
-			
-			// Update our tracked max live edge and timestamp (represents server's actual position)
-			if (currentBufferedEdge > this.maxLiveEdge) {
-				this.maxLiveEdge = currentBufferedEdge;
-				this.lastLiveEdgeTime = Date.now();
-			}
+		this.streamDuration();
+		
+		const strStart = this.streamStart;
+		const worldTime = this.getTimeSecs();
+		console.log('getTimeSecs called by updateLiveButton');
+
+		if (this.clientStart == 0){
+			this.clientStart = worldTime - strStart;
+			console.log('[CustomAudioPlayer] Set clientStart:', this.formatTime(this.clientStart), 'worldTime:', this.formatTime(worldTime), 'streamStart:', this.formatTime(strStart));
 		}
-		
-		// Estimate the live edge by adding elapsed time since we last knew it
-		const elapsedSeconds = (Date.now() - this.lastLiveEdgeTime) / 1000;
-		const estimatedLiveEdge = this.maxLiveEdge + elapsedSeconds;
-		
-		const currentTime = this.audioElement.currentTime;
-		const timeBehind = estimatedLiveEdge - currentTime;
-		const behindThreshold = 3; // Enable button if more than 3 seconds behind
+
+		this.clientTime = this.clientStart + this.audioElement.currentTime;
+		console.log('[CustomAudioPlayer] clientTime calculation - clientStart:', this.formatTime(this.clientStart), 'worldTime:', this.formatTime(worldTime), 'currentTime:', this.formatTime(this.audioElement.currentTime), 'result:', this.formatTime(this.clientTime));
+		const streamTime = worldTime - strStart;
+		const timeBehind = streamTime - this.clientTime;
+		const behindThreshold = 5; // Enable button if more than 5 seconds behind
 		const isBehind = timeBehind > behindThreshold;
 		
 		// Log for debugging
-		console.log('[CustomAudioPlayer] Live check - Current:', currentTime.toFixed(2), 'Live Edge (Est):', estimatedLiveEdge.toFixed(2), 'Behind:', timeBehind.toFixed(2), 'Paused:', this.audioElement.paused);
+		console.log('[CustomAudioPlayer] Live check - Current:', this.formatTime(this.clientTime.toFixed(2)), 'Live Edge:', this.formatTime(streamTime.toFixed(2)), 'Behind:', this.formatTime(timeBehind.toFixed(2)), 'Stream Start:', this.formatTime(this.streamStart), 'Paused:', this.audioElement.paused);
 		
 		// Disable button if live, enable if behind
 		liveBtn.disabled = !isBehind;
@@ -364,13 +357,16 @@ class CustomAudioPlayer extends HTMLElement {
 	}
 
 	jumpToLive() {
-		// Use the same estimated live edge calculation as updateLiveButton
-		const elapsedSeconds = (Date.now() - this.lastLiveEdgeTime) / 1000;
-		const estimatedLiveEdge = this.maxLiveEdge + elapsedSeconds;
+		// Get the current stream duration by calculating with stream start time
+		const worldTime = this.getTimeSecs();
+		console.log('getTimeSecs called by jumpToLive');
+		const streamTime = worldTime - this.streamStart;
+
+		console.log('Stream duration: ', this.formatTime(streamTime));
 		
 		// Jump to the estimated live edge
-		this.audioElement.currentTime = estimatedLiveEdge;
-		console.log('[CustomAudioPlayer] Jumped to live position:', this.formatTime(estimatedLiveEdge));
+		this.audioElement.currentTime = streamTime - 3;
+		console.log('[CustomAudioPlayer] Jumped to live position:', this.formatTime(streamTime - 3));
 		
 		// Resume playback if it was paused
 		if (this.audioElement.paused) {
@@ -378,27 +374,52 @@ class CustomAudioPlayer extends HTMLElement {
 		}
 	}
 
-	// Public methods for external control
-	play() {
-		this.audioElement.play();
-	}
+	streamDuration() {
+		const timeKeeper = () => {
+			fetch(this.ICECAST_URL)
+				.then(r => r.json())
+				.then(data => {
+					const timeInSeconds = this.getTimeSecs();
+					console.log('getTimeSecs called by streamDuration');
 
-	pause() {
-		this.audioElement.pause();
-	}
+					// Returns the time that the stream started in seconds (EST)
+					function liveStartSecs() {
+						const dateArr = data.icestats.source.stream_start.split(/\s+/);
+						console.log('Stream start date as an array:', dateArr);
+						const timeStrip = dateArr[4].split(':');
+						console.log('Stream start time as an array:', timeStrip);
+						const startInSecs = (parseInt(timeStrip[0]) * (60 * 60)) + (parseInt(timeStrip[1]) * 60) + parseInt(timeStrip[2]);
+						console.log('Stream start time in Seconds:', startInSecs);
+						return startInSecs;
+					}
+					const streamStartSecs = liveStartSecs();
+					this.streamStart = streamStartSecs;
+					//console.log('Local variable:', streamStartSecs, 'Global Variable:', this.streamStart);
 
-	setSrc(src) {
-		const source = this.audioElement.querySelector('source');
-		if (source) {
-			source.src = src;
-		}
-		this.audioElement.load();
+					let streamDur = timeInSeconds - streamStartSecs;
+					this.streamDur = streamDur; // Store as property
+					//console.log('Stream duration in seconds:', streamDur);
+
+					// Formats time from seconds back into a readable format
+					// Mostly usefull for debug so I'll leave out unless I need it
+					/* function timeFormat(timeToForm) {
+						const seconds = Math.floor(timeToForm % 60).toString().padStart(2, '0');
+						const minutes = Math.floor((timeToForm / 60) % 60).toString().padStart(2, '0');
+						const wholeMinutes = Math.floor(timeToForm / 60);
+						const hours = Math.floor(wholeMinutes / 60).toString().padStart(2, '0');
+						return `${hours}:${minutes}:${seconds}`;
+					}
+
+					const formattedStream = timeFormat(streamDur);
+					console.log('Formatted stream duration:', formattedStream); */
+				});
+		};
+		timeKeeper();
+		//return;
 	}
 
 	initializeIcecastBadge() {
-		const ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl';
-		const POLL_INTERVAL = 30000;
-		const badge = this.shadowRoot.querySelector('.icecast-status-badge');
+		const badge = this.shadowRoot.querySelector('.icecast-status-badge'); 
 		
 		if (!badge) return; // Badge not in DOM
 
@@ -413,9 +434,12 @@ class CustomAudioPlayer extends HTMLElement {
 		}
 
 		const updateStatus = () => {
-			fetch(ICECAST_URL)
+			fetch(this.ICECAST_URL)
 				.then(r => r.json())
 				.then(data => {
+					console.log('Fetch successful, data received');
+
+					//checking if stream is live
 					const isLive = isStreamLive(data, mountpoint);
 					const badgeEl = badge.querySelector('.icecast-badge');
 					if (badgeEl) {
@@ -429,9 +453,8 @@ class CustomAudioPlayer extends HTMLElement {
 					}
 				});
 		};
-
 		updateStatus();
-		setInterval(updateStatus, POLL_INTERVAL);
+		setInterval(updateStatus, this.POLL_INTERVAL);
 	}
 }
 
