@@ -166,11 +166,11 @@ export function render() {
             </button>
             
             <div class="progress-section">
-                <span class="current-time">0:00</span>
+                <span class="current-time">00:00:00</span>
                 <div class="progress-bar">
                     <div class="progress-fill"></div>
                 </div>
-                <span class="duration-time">0:00</span>
+                <span class="duration-time">00:00:00</span>
             </div>
         </div>
 

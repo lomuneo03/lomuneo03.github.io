@@ -6,24 +6,30 @@
 //Module Imports
 
 import { render } from './PlayGUI.js';
-import * as DButils from './DebugUtils.js';
-import * as Utils from './Utils.js';
+import { Utilities, TimeUtilities, DebugUtilities } from './Utils.js';
 
 class CustomAudioPlayer extends HTMLElement {
 	constructor() {
 		super();
 		this.attachShadow({ mode: 'open' });
 		this.isPlaying = false;
-		this.duration = 0;
-		this.currentTime = 0;
-		this.clientStart = 0; // Time of day client first pressed play/jumpToLive in seconds
-		this.clientTime = 0; // Current time in the broadcast for the client
+		this.clientConnect = 0; // Time of day client first pressed play/jumpToLive in seconds
+		this.clientStart = 0; // Time in the stream duration that the client first pressed play/jumpTolive (for calculating audioElement time)
 		this.streamStart = 0; // Time of day stream started
 		this.streamDur = 0; // Current duration of stream
+		this.worldTime = 0; // Current time
+		this.playertime = 0;
+		this.duration = 0;
+
+		//Utilities modules
+		this.DButils = new DebugUtilities;
+		this.Utils = new Utilities;
+		this.TUtils = new TimeUtilities;
 
 		//icecast json variables
 		this.ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl';
 		this.POLL_INTERVAL = 30000;
+		console.log('Constructor finished');
 	}
 
 	//Defining class fields for imported functions
@@ -32,33 +38,44 @@ class CustomAudioPlayer extends HTMLElement {
 	render = () => render.call(this);
 	
 	//Debug utilities class field imports
-	onLoadStart = () => DButils.onLoadStart.call(this);
-	onProgress = () => DButils.onProgress.call(this);
-	onDurationChange = () => DButils.onDurationChange.call(this);
-	onSuspend = () => DButils.onSuspend.call(this);
-	onAbort = () => DButils.onAbort.call(this);
-	onAudioError = () => DButils.onAudioError.call(this);
-	onStalled = () => DButils.onStalled.call(this);
-	onCanPlay = () => DButils.onCanPlay.call(this);
-	onPlaying = () => DButils.onPlaying.call(this);
-	onWaiting = () => DButils.onWaiting.call(this);
+	onLoadStart = () => this.DButils.onLoadStart.call(this);
+	onProgress = () => this.DButils.onProgress.call(this);
+	onDurationChange = () => this.DButils.onDurationChange.call(this);
+	onSuspend = () => this.DButils.onSuspend.call(this);
+	onAbort = () => this.DButils.onAbort.call(this);
+	onAudioError = () => this.DButils.onAudioError.call(this);
+	onStalled = () => this.DButils.onStalled.call(this);
+	onCanPlay = () => this.DButils.onCanPlay.call(this);
+	onPlaying = () => this.DButils.onPlaying.call(this);
+	onWaiting = () => this.DButils.onWaiting.call(this);
 
 	//General utilities
-	play = () => Utils.play();
-	pause = () => Utils.pause();
-	setSrc = (src) => Utils.setSrc(src);
-	formatTime = (seconds) => Utils.formatTime(seconds);
+	play = () => this.Utils.play.call(this);
+	pause = () => this.Utils.pause.call(this);
+	setSrc = (src) => this.Utils.setSrc.call(this, src);
+	onPlay = () => this.Utils.onPlay.call(this);
+	onPause = () => this.Utils.onPause.call(this);
+	onTimeUpdate = () => this.Utils.onTimeUpdate.call(this);
+	onLoadedMetadata = () => this.Utils.onLoadedMetadata.call(this);
+	onEnded = () => this.Utils.onEnded.call(this);
+	seek = (e) => this.Utils.seek.call(this, e);
+	togglePlayPause = () => this.Utils.togglePlayPause.call(this);
 
+	//Time utilities
+	getTimeSecs = () => this.TUtils.getTimeSecs();
+	formatTime = (seconds) => this.TUtils.formatTime(seconds);
+	getStreamStart = () => this.TUtils.getStreamStart();
 
 	connectedCallback() {
 		console.log('[CustomAudioPlayer] connectedCallback fired');
 		console.log('[CustomAudioPlayer] Current children:', Array.from(this.children).map(el => `${el.tagName}${el.src ? `(${el.src})` : ''}`));
 		
-		//General utilities
-		//play() = () => Utils.play(this);
-		
 		//initialize functions
 		this.render();
+
+		this.TUtils.getStreamStart().then(start => {
+			this.streamStart = start;
+		});
 		
 		// Use a small delay to ensure all child elements are parsed
 		// This is necessary because connectedCallback can fire before parser has finished adding child elements
@@ -174,172 +191,31 @@ class CustomAudioPlayer extends HTMLElement {
 		});
 	}
 
-	//Toggles play/pause
-	//Includes debug codes first
-	//Uses a promise to check success
-	togglePlayPause() {
-
-		if (this.audioElement.paused) {
-			console.log('[CustomAudioPlayer] Attempting to play...');
-			console.log('[CustomAudioPlayer] ReadyState:', this.audioElement.readyState, '(0=NOTHING, 1=METADATA, 2=CURRENT, 3=FUTURE, 4=ENOUGH)');
-			console.log('[CustomAudioPlayer] NetworkState:', this.audioElement.networkState, '(0=EMPTY, 1=IDLE, 2=LOADING, 3=NO_SOURCE)');
-			console.log('[CustomAudioPlayer] Current time:', this.audioElement.currentTime);
-
-			const playPromise = this.audioElement.play();
-
-			//Promise returns either a value or undefined, .then and .catch execute based on this result
-			if (playPromise !== undefined) {
-				playPromise
-					.then(() => {
-						console.log('[CustomAudioPlayer] Play succeeded');
-					})
-					.catch(error => {
-						console.error('[CustomAudioPlayer] Play failed:', error.message);
-						console.error('[CustomAudioPlayer] Error name:', error.name);
-					});
-			}
-		} else {
-			console.log('[CustomAudioPlayer] Pausing');
-			this.audioElement.pause();
-		}
-	}
-
-	//Called when play button is pressed
-	onPlay() {
-		if (this.clientStart == 0) {
-			const worldTime = this.getTimeSecs();
-			console.log('getTimeSecs called by onPlay');
-			this.clientStart = worldTime - this.streamstart;
-		}
-
-		console.log('Client started listening:', this.formatTime(this.clientStart));
-
-		this.isPlaying = true;
-		const btn = this.shadowRoot.querySelector('.play-pause-btn');
-		btn.querySelector('.play-icon').textContent = '⏸';
-		btn.style.fontSize = '30px';
-		btn.style.bottom = '3px';
-		this.dispatchEvent(new CustomEvent('play'));
-	}
-
-	//Called when pause button is pressed
-	onPause() {
-		this.isPlaying = false;
-		const btn = this.shadowRoot.querySelector('.play-pause-btn');
-		btn.querySelector('.play-icon').textContent = '▶';
-		btn.style.fontSize = '25px';
-		btn.style.bottom = '0px';
-		this.dispatchEvent(new CustomEvent('pause'));
-	}
-
-	//For live, this.duration always resolves to "Infinity"
-	//Only works for static audio files, needs update for live broadcast
-	onTimeUpdate() {
-		this.currentTime = this.audioElement.currentTime;
-		const percentage = (this.currentTime / this.duration) * 100;
-		this.shadowRoot.querySelector('.progress-fill').style.width = percentage + '%';
-		this.shadowRoot.querySelector('.current-time').textContent = this.formatTime(this.currentTime);
-	}
-
-	//Mainly useful for static audio files, sets duration time to -:-- if it's a livestream
-	onLoadedMetadata() {
-		this.duration = this.audioElement.duration;
-		console.log('Duration debug:', this.duration);
-		
-		if (this.duration == 'Infinity'){
-			this.shadowRoot.querySelector('.duration-time').textContent = '--:--';
-		} else {
-			this.shadowRoot.querySelector('.duration-time').textContent = this.formatTime(this.duration);
-		}
-	}
-
-	//This doesnt seem to do anything... creates a new custom event 'ended' but this is only
-	//refrenced above at 141 in setupEventListeners and I can't find anywhere that the event
-	//is referenced to create a behavior. Will leave in case I'm wrong in some way
-	onEnded() {
-		this.dispatchEvent(new CustomEvent('ended'));
-	}
-
-	//I believe this is used to seek with the playbar, but it doesn't work and I don't
-	//think I need it anyway, but I'll leave it until I can figure out for sure
-	seek(e) {
-		const rect = e.currentTarget.getBoundingClientRect();
-		const percent = (e.clientX - rect.left) / rect.width;
-		this.audioElement.currentTime = percent * this.duration;
-	}
-
-	// Returns EST time converted to seconds
-	// Server runs on EST time so this is useful for a number of things
-	getTimeSecs() {
-		try {
-			console.log('getTimeSecs called');
-			const now = new Date();
-			
-			// Format with timezone and parse the result manually
-			const estString = now.toLocaleString('en-US', { 
-				timeZone: 'America/New_York',
-				hour12: false,
-				year: 'numeric',
-				month: '2-digit',
-				day: '2-digit',
-				hour: '2-digit',
-				minute: '2-digit',
-				second: '2-digit'
-			});
-			
-			// Parse the formatted string: "MM/DD/YYYY, HH:mm:ss"
-			const parts = estString.split(/[\/,:\s]+/);
-			const hours = parseInt(parts[3]);
-			const minutes = parseInt(parts[4]);
-			const seconds = parseInt(parts[5]);
-			
-			//console.log('Parsed EST - Hours:', hours, 'Minutes:', minutes, 'Seconds:', seconds);
-			
-			let secTime = (hours * (60 * 60) + (minutes * 60) + seconds);
-			//console.log('Time in seconds:', secTime);
-
-			return secTime;
-		} catch (err) {
-			console.error('Error in getTimeSecs:', err);
-			// Fallback: use local time
-			const now = new Date();
-			const hours = now.getHours();
-			const minutes = now.getMinutes();
-			const seconds = now.getSeconds();
-			const secTime = (hours * (60 * 60) + (minutes * 60) + seconds);
-			console.log('Using fallback local time:', secTime);
-			return secTime;
-		}
-	}
-
 	//Enables or disables the live button functionality based on if the user has fallen 3 or
 	//more seconds behind the broadcast. This is done by using an estimate timer that runs
 	//in parallel with the stream to estimate where the stream is. I think there could be a
 	//better way to do this using icecast status-json data but haven't figured it out yet
 	updateLiveButton() {
 		const liveBtn = this.shadowRoot.querySelector('.icecast-badge');
-		if (!liveBtn) return;
-
-		this.streamDuration();
+		if (!liveBtn || !this.streamStart) return;
 		
-		const strStart = this.streamStart;
-		const worldTime = this.getTimeSecs();
+		console.log(this.streamStart);
+		this.worldTime = this.getTimeSecs();
 		console.log('getTimeSecs called by updateLiveButton');
+		this.streamDur = this.worldTime - this.streamStart;
 
-		if (this.clientStart == 0){
-			this.clientStart = worldTime - strStart;
-			console.log('[CustomAudioPlayer] Set clientStart:', this.formatTime(this.clientStart), 'worldTime:', this.formatTime(worldTime), 'streamStart:', this.formatTime(strStart));
+		if (!this.clientConnect){
+			this.clientConnect = this.worldTime - this.streamStart;
+			console.log('[CustomAudioPlayer] Set clientConnect:', this.formatTime(this.clientConnect));
 		}
 
-		this.clientTime = this.clientStart + this.audioElement.currentTime;
-		console.log('[CustomAudioPlayer] clientTime calculation - clientStart:', this.formatTime(this.clientStart), 'worldTime:', this.formatTime(worldTime), 'currentTime:', this.formatTime(this.audioElement.currentTime), 'result:', this.formatTime(this.clientTime));
-		const streamTime = worldTime - strStart;
-		const timeBehind = streamTime - this.clientTime;
+		
+		const timeBehind = this.streamDur - (this.clientStart + this.audioElement.currentTime);
 		const behindThreshold = 5; // Enable button if more than 5 seconds behind
 		const isBehind = timeBehind > behindThreshold;
 		
 		// Log for debugging
-		console.log('[CustomAudioPlayer] Live check - Current:', this.formatTime(this.clientTime.toFixed(2)), 'Live Edge:', this.formatTime(streamTime.toFixed(2)), 'Behind:', this.formatTime(timeBehind.toFixed(2)), 'Stream Start:', this.formatTime(this.streamStart), 'Paused:', this.audioElement.paused);
+		console.log('[CustomAudioPlayer] Live check - Client start:', this.formatTime(this.clientStart), 'Current:', this.formatTime(this.audioElement.currentTime.toFixed(2)), 'Live Edge:', this.formatTime(this.streamDur.toFixed(2)), 'Behind:', this.formatTime(timeBehind.toFixed(2)), 'Stream Start:', this.formatTime(this.streamStart), 'Paused:', this.audioElement.paused);
 		
 		// Disable button if live, enable if behind
 		liveBtn.disabled = !isBehind;
@@ -357,65 +233,41 @@ class CustomAudioPlayer extends HTMLElement {
 	}
 
 	jumpToLive() {
-		// Get the current stream duration by calculating with stream start time
-		const worldTime = this.getTimeSecs();
-		console.log('getTimeSecs called by jumpToLive');
-		const streamTime = worldTime - this.streamStart;
+		this.worldTime = this.getTimeSecs();
+		this.streamDur = this.worldTime - this.streamStart;
+		if (!this.clientConnect){
+			this.clientConnect = this.worldTime - this.streamStart;
+			this.clientStart = this.streamDur;
+			console.log('[CustomAudioPlayer] Set clientConnect:', this.formatTime(this.clientConnect));
+			if (this.clientStart != 0){
+				console.log('[CustomAudioPlayer] clientStart sucess:', this.formatTime(this.clientStart));
+			} else {
+				console.log('[CustomAudioPlayer] clientStart failed:', this.formatTime(this.clientStart));
+			}
+			console.log('[CustomAudioPlayer] WorldTime:', this.formatTime(this.worldTime), 'streamStart:', this.formatTime(this.streamStart));
+		} else if (!this.clientStart){
+			this.clientStart = this.streamDur;
+			console.log('[CustomAudioPlayer] Set clientStart:', this.formatTime(this.clientStart)); 
+			console.log('[CustomAudioPlayer] WorldTime:', this.formatTime(this.worldTime), 'streamStart:', this.formatTime(this.streamStart), 'clientConnect:', this.formatTime(this.clientConnect));
+		}
 
-		console.log('Stream duration: ', this.formatTime(streamTime));
+		// Get the current stream duration by calculating with stream start time
+		this.worldTime = this.getTimeSecs();
+		console.log('getTimeSecs called by jumpToLive');
+		this.streamDur = this.worldTime - this.streamStart;
+
+		console.log('Stream duration: ', this.formatTime(this.streamDur), 'Client start time:', this.formatTime(this.clientStart));
 		
 		// Jump to the estimated live edge
-		this.audioElement.currentTime = streamTime - 3;
-		console.log('[CustomAudioPlayer] Jumped to live position:', this.formatTime(streamTime - 3));
+	
+		this.audioElement.currentTime = this.streamDur - this.clientStart - 3;
+		console.log('-------------------------------------------------------------------------------------------------')
+		console.log('[CustomAudioPlayer] Jumped to live position:', this.formatTime(this.streamDur - 3));
 		
 		// Resume playback if it was paused
 		if (this.audioElement.paused) {
 			this.audioElement.play();
 		}
-	}
-
-	streamDuration() {
-		const timeKeeper = () => {
-			fetch(this.ICECAST_URL)
-				.then(r => r.json())
-				.then(data => {
-					const timeInSeconds = this.getTimeSecs();
-					console.log('getTimeSecs called by streamDuration');
-
-					// Returns the time that the stream started in seconds (EST)
-					function liveStartSecs() {
-						const dateArr = data.icestats.source.stream_start.split(/\s+/);
-						console.log('Stream start date as an array:', dateArr);
-						const timeStrip = dateArr[4].split(':');
-						console.log('Stream start time as an array:', timeStrip);
-						const startInSecs = (parseInt(timeStrip[0]) * (60 * 60)) + (parseInt(timeStrip[1]) * 60) + parseInt(timeStrip[2]);
-						console.log('Stream start time in Seconds:', startInSecs);
-						return startInSecs;
-					}
-					const streamStartSecs = liveStartSecs();
-					this.streamStart = streamStartSecs;
-					//console.log('Local variable:', streamStartSecs, 'Global Variable:', this.streamStart);
-
-					let streamDur = timeInSeconds - streamStartSecs;
-					this.streamDur = streamDur; // Store as property
-					//console.log('Stream duration in seconds:', streamDur);
-
-					// Formats time from seconds back into a readable format
-					// Mostly usefull for debug so I'll leave out unless I need it
-					/* function timeFormat(timeToForm) {
-						const seconds = Math.floor(timeToForm % 60).toString().padStart(2, '0');
-						const minutes = Math.floor((timeToForm / 60) % 60).toString().padStart(2, '0');
-						const wholeMinutes = Math.floor(timeToForm / 60);
-						const hours = Math.floor(wholeMinutes / 60).toString().padStart(2, '0');
-						return `${hours}:${minutes}:${seconds}`;
-					}
-
-					const formattedStream = timeFormat(streamDur);
-					console.log('Formatted stream duration:', formattedStream); */
-				});
-		};
-		timeKeeper();
-		//return;
 	}
 
 	initializeIcecastBadge() {
