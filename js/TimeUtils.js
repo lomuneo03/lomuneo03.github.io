@@ -5,6 +5,7 @@ class TimeUtilities {
         this.streamStartSecs = 0;
     }
 
+    //------Add in second formatting for front facing with 0:00:00 format not 00:00:00
     //Broadcast time is given in seconds
     //Returns time formatted in Hours:Minutes:Seconds
     //If time is static and appears as 00:00:00, it is most likely NaN
@@ -21,7 +22,6 @@ class TimeUtilities {
 	// Server runs on EST time so this is useful for a number of things
 	getTimeSecs() {
 		try {
-			console.log('getTimeSecs called');
 			const now = new Date();
 			
 			// Format with timezone and parse the result manually

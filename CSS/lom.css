@@ -1,7 +1,9 @@
 /*cascading stylesheet, easy to make just define by html tag*/
 
+
+/* color tests: 0000cd,  */
 html{
-	background-color: #0000cd;
+	background-color: #0000f4;
 	background-image: url(content/LogoTranspWP.webp);
 	background-position: center;
 	background-size: 55%;

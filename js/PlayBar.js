@@ -201,7 +201,6 @@ class CustomAudioPlayer extends HTMLElement {
 		
 		console.log(this.streamStart);
 		this.worldTime = this.getTimeSecs();
-		console.log('getTimeSecs called by updateLiveButton');
 		this.streamDur = this.worldTime - this.streamStart;
 
 		if (!this.clientConnect){
@@ -253,7 +252,6 @@ class CustomAudioPlayer extends HTMLElement {
 
 		// Get the current stream duration by calculating with stream start time
 		this.worldTime = this.getTimeSecs();
-		console.log('getTimeSecs called by jumpToLive');
 		this.streamDur = this.worldTime - this.streamStart;
 
 		console.log('Stream duration: ', this.formatTime(this.streamDur), 'Client start time:', this.formatTime(this.clientStart));
