@@ -1,13 +1,14 @@
 /*cascading stylesheet, easy to make just define by html tag*/
 
+@font-face {
+	font-family: Xylem;
+	src: url(content/Xylem.woff);
+}
 
-/* color tests: 0000cd,  */
+/* color tests: 0000cd, 0000f4, 0000f0 */
 html{
-	background-color: #0000f4;
-	background-image: url(content/LogoTranspWP.webp);
-	background-position: center;
-	background-size: 55%;
-	background-repeat: no-repeat;
+	background-color: #0000ff;
+	/* background-image: url(content/LogoTranspWP.webp); */
 }
 
 /*.container{
@@ -17,51 +18,42 @@ html{
 
 .container{
 	display: flex;
+	flex-direction: column;
+	position: relative;
 	align-items: center;
-	margin-top: 75vh;
 	justify-content: center;
-	max-width: fit-content;
 	margin-left: auto;
 	margin-right: auto;
 }
 
-.icecast-badge {
-	position: relative;
-	top: 2px;
-	display: inline-flex;
+.logo {
+	width: 50vw;
+	height: auto;
+	display: flex;
+}
+
+.header {
+	font-family: Xylem;
+	text-align: center;
+	color: white;
+	font-size: 100px;
+	letter-spacing: 0.1em;
+	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 8px 8px;
-	border-radius: 50%;
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	font-size: 13px;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
+	justify-content: center;
+	margin: 0px;
 }
-.icecast-badge.live {
-	background: none;
-	color: #c52222;
-	border: 1.5px #8dbbff;
+
+.sub {
+	font-family: 'Courier New', Courier, monospace;
+	text-align: center;
+	color: white;
+	letter-spacing: 1em;
 }
-.icecast-badge.offline {
-	background: none;
-	color: #6B7280;
-	border: 1.5px solid #8dbbff;
-}
-.icecast-dot {
-	width: 25px;
-	height: 25px;
-	border-radius: 50%;
-}
-.icecast-badge.live .icecast-dot {
-	background: #c52222;
-	animation: icecast-pulse 2s ease-in-out infinite;
-}
-.icecast-badge.offline .icecast-dot {
-	background: #6B7280;
-}
-@keyframes icecast-pulse {
-	0%, 100% { opacity: 1; transform: scale(1); }
-	50% { opacity: 0.5; transform: scale(1.2); }
+
+.player {
+	margin-right: 2.5%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }

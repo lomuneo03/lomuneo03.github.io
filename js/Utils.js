@@ -89,9 +89,7 @@ class Utilities{
 
         this.isPlaying = true;
         const btn = this.shadowRoot.querySelector('.play-pause-btn');
-        btn.querySelector('.play-icon').textContent = '⏸';
-        btn.style.fontSize = '30px';
-        btn.style.bottom = '3px';
+        btn.querySelector('.play-icon').src = '../Content/Pause.png';
         this.dispatchEvent(new CustomEvent('play'));
     }
 
@@ -99,23 +97,22 @@ class Utilities{
     onPause() {
         this.isPlaying = false;
         const btn = this.shadowRoot.querySelector('.play-pause-btn');
-        btn.querySelector('.play-icon').textContent = '▶';
-        btn.style.fontSize = '25px';
-        btn.style.bottom = '0px';
+        btn.querySelector('.play-icon').src = '../Content/Play.png';
         this.dispatchEvent(new CustomEvent('pause'));
     }
 
-    //somewhat useless functions that will become useful if static files are to be played in place of
-    //a broadcast
-
+    //Sets timecodes in the player
     //For live, this.duration always resolves to "Infinity"
     //Only works for static audio files, needs update for live broadcast
     onTimeUpdate() {
         this.playertime = this.audioElement.currentTime;
         const percentage = (this.playertime / this.duration) * 100;
         this.shadowRoot.querySelector('.progress-fill').style.width = percentage + '%';
-        this.shadowRoot.querySelector('.current-time').textContent = this.formatTime(this.playertime);
+        this.shadowRoot.querySelector('.current-time').textContent = this.formatTimeLive(this.playertime);
     }
+
+    //somewhat useless functions that will become useful if static files are to be played in place of
+    //a broadcast
 
     //Mainly useful for static audio files, sets duration time to --:--:-- if it's a livestream
 	onLoadedMetadata() {
@@ -123,7 +120,7 @@ class Utilities{
 		console.log('Duration debug:', this.duration);
 		
 		if (this.duration == 'Infinity'){
-			this.shadowRoot.querySelector('.duration-time').textContent = '--:--:--';
+			this.shadowRoot.querySelector('.duration-time').textContent = '-:--:--';
 		} else {
 			this.shadowRoot.querySelector('.duration-time').textContent = this.formatTime(this.duration);
 		}

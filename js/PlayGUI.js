@@ -22,6 +22,12 @@ export function render() {
                 max-width: 500px;
                 box-sizing: border-box;
             }
+
+            .align {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
  
             .icecast-badge {
                 display: flex;
@@ -92,15 +98,22 @@ export function render() {
                 display: flex;
                 align-items: center;
                 position: relative;
-                left: 3%;
                 justify-content: center;
-                font-size: 25px;
                 transition: all 0.2s ease;
             }
 
             .play-pause-btn:hover {
                 background: none;
                 color: var(--background-color);
+                scale: 115%;
+                opacity: 75%;
+            }
+
+            .play-icon {
+                width: 75%;
+                height: auto;
+                filter: invert(100%);
+
             }
 
             .progress-section {
@@ -140,13 +153,6 @@ export function render() {
                 transform: translateX(50%);
             }
 
-            .time-display {
-                display: flex;
-                justify-content: space-between;
-                font-size: 12px;
-                color: #888;
-            }
-
             .duration-time{
                 white-space: nowrap;
             }
@@ -161,16 +167,18 @@ export function render() {
                 <div class="icecast-badge offline"><span class="icecast-dot"></span></div>
             </div>
 
-            <button class="play-pause-btn" aria-label="Play/Pause">
-                <span class="play-icon">▶</span>
-            </button>
-            
-            <div class="progress-section">
-                <span class="current-time">0:00:00</span>
-                <div class="progress-bar">
-                    <div class="progress-fill"></div>
+            <div class="align">
+                <button class="play-pause-btn" aria-label="Play/Pause">
+                    <img class="play-icon" src="../Content/Play.png">
+                </button>
+                
+                <div class="progress-section">
+                    <span class="current-time">0:00:00</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="duration-time">0:00:00</span>
                 </div>
-                <span class="duration-time">0:00:00</span>
             </div>
         </div>
 
