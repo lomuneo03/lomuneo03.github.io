@@ -17,6 +17,15 @@ class TimeUtilities {
         const secs = Math.floor(seconds % 60);
         return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
+    
+    formatTimeLive(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00:00';
+        const temp = Math.floor(seconds / 60);
+        const hours = Math.floor(temp / 60);
+        const mins = Math.floor(temp % 60);
+        const secs = Math.floor(seconds % 60);
+        return `${hours.toString().padStart(1, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
 
     // Returns EST time converted to seconds
 	// Server runs on EST time so this is useful for a number of things
