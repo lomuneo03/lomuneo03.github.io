@@ -1,7 +1,7 @@
 class TimeUtilities {
     constructor() {
         //icecast json variables
-		this.ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl';
+		this.ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl?mount=/lomuneo';
         this.streamStartSecs = 0;
     }
 

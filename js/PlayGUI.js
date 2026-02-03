@@ -44,7 +44,7 @@ export function render() {
 
             .icecast-badge.live {
                 cursor: pointer;
-                background: rgba(107, 114, 128, 0.2);;
+                background: none;
                 color: #c52222;
             }
 
@@ -62,7 +62,7 @@ export function render() {
 
             .icecast-badge.caught-up .icecast-dot {
                 background: #c52222;
-                animation: pulse 1.5s ease-in-out infinite;
+                animation: grow 1.5s ease-in-out infinite;
             }
 
             .icecast-dot {
@@ -84,6 +84,11 @@ export function render() {
             @keyframes pulse {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
+            }
+
+            @keyframes grow {
+                0% { box-shadow: 0 0 0 0 rgba(199, 34, 34, 0.5); }
+                75% { box-shadow: 0 0 0 10px rgba(199, 34, 34, 0); }
             }
 
             .play-pause-btn {

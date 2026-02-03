@@ -27,7 +27,7 @@ class CustomAudioPlayer extends HTMLElement {
 		this.TUtils = new TimeUtilities;
 
 		//icecast json variables
-		this.ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl';
+		this.ICECAST_URL = 'http://dev.motormeme.com:8000/status-json.xsl?mount=/lomuneo';
 		this.POLL_INTERVAL = 30000;
 		console.log('Constructor finished');
 	}
@@ -65,6 +65,7 @@ class CustomAudioPlayer extends HTMLElement {
 	getTimeSecs = () => this.TUtils.getTimeSecs();
 	formatTime = (seconds) => this.TUtils.formatTime(seconds);
 	getStreamStart = () => this.TUtils.getStreamStart();
+	formatTimeLive = (seconds) => this.TUtils.formatTimeLive(seconds);
 
 	connectedCallback() {
 		console.log('[CustomAudioPlayer] connectedCallback fired');

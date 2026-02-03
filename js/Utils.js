@@ -1,4 +1,6 @@
 
+import { TimeUtilities } from './TimeUtils.js';
+
 class Utilities{
     constructor() {
         //these are only used in unused functions for seeking, setting duration of audiofile, etc.
@@ -6,6 +8,9 @@ class Utilities{
         this.playertime = 0;
         this.duration = 0;
     }
+
+	//Time Utilities
+	formatTimeLive = (seconds) => this.formatTimeLive(seconds);
 
     // Public methods for external control
     play() {
@@ -122,7 +127,7 @@ class Utilities{
 		if (this.duration == 'Infinity'){
 			this.shadowRoot.querySelector('.duration-time').textContent = '-:--:--';
 		} else {
-			this.shadowRoot.querySelector('.duration-time').textContent = this.formatTime(this.duration);
+			this.shadowRoot.querySelector('.duration-time').textContent = this.formatTimeLive(this.duration);
 		}
 	}
 
